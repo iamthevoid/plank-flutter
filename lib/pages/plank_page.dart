@@ -1,11 +1,13 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:plank/plank_state.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:plank/models/counter.dart';
+import 'package:plank/models/pair.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:plank/utils.dart';
 import 'package:plank/widgets/duration_box.dart';
-import 'package:plank/widgets/optional.dart';
 import 'package:plank/widgets/plank_run_button.dart';
 
-import '../plank_bloc.dart';
+import '../plank_view_model.dart';
 
 class PlankPage extends StatefulWidget {
   static final String route = '/';
@@ -15,149 +17,184 @@ class PlankPage extends StatefulWidget {
 }
 
 class _PlankPageState extends State<PlankPage> {
-  final TextEditingController _activeController =
-      TextEditingController(text: "${PlankBloc.DEFAULT_ACTIVE_PERIOD}");
-
-  final TextEditingController _restController =
-      TextEditingController(text: "${PlankBloc.DEFAULT_REST_PERIOD}");
-
-  PlankBloc _bloc;
+  TextEditingController _activeController;
+  TextEditingController _restController;
+  PlankViewModel _vm = PlankViewModel();
 
   @override
   void initState() {
-    _bloc = PlankBloc();
+    _initControllers();
     super.initState();
   }
 
   @override
   void dispose() {
-    _bloc.close();
+    _vm.dispose();
+    _activeController.dispose();
+    _restController.dispose();
     super.dispose();
   }
 
+  void _initControllers() async {
+    var active = await _vm.activePeriod();
+    var rest = await _vm.restPeriod();
+    setState(() {
+      _activeController = TextEditingController(text: "$active");
+      _restController = TextEditingController(text: "$rest");
+    });
+  }
+
   @override
-  Widget build(BuildContext context) => BlocBuilder(
-        bloc: _bloc,
-        builder: (bloc, state) => Scaffold(
-          backgroundColor: Colors.grey[800],
-          resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            backgroundColor: Colors.grey[900],
-            centerTitle: true,
-            elevation: 12,
-            title: Text(
-              "Plank",
-              style: TextStyle(
-                color: Colors.amber[200],
+  Widget build(BuildContext context) {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    return Scaffold(
+      backgroundColor: Colors.grey[800],
+      resizeToAvoidBottomInset: false,
+      appBar: AppBar(
+        backgroundColor: Colors.grey[900],
+        centerTitle: true,
+        elevation: 12,
+        title: Text(
+          "Plank",
+          style: TextStyle(
+            color: Colors.amber[200],
+          ),
+        ),
+      ),
+      body: Column(
+        children: <Widget>[
+          Padding(
+            padding: EdgeInsets.only(top: 32),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: <Widget>[
+                StreamBuilder<Pair<Counter, bool>>(
+                  stream: Rx.combineLatest2(_vm.counter, _vm.isEditing, (a, b) => Pair(a, b)),
+                  builder: (context, snapshot) => !snapshot.hasData ? SizedBox.shrink() : DurationBox(
+                    onTextChange: _vm.updateActive,
+                    editable: snapshot.data.second,
+                    controller: _activeController,
+                    nonEditableText: 'Active Period: ${snapshot.data?.first?.activeDurationSeconds}s',
+                    editableHint: 'Active (sec)',
+                  ),
+                ),
+                StreamBuilder<Pair<Counter, bool>>(
+                  stream: Rx.combineLatest2(_vm.counter, _vm.isEditing, (counter, isEditing) => Pair(counter, isEditing)),
+                  builder: (context, snapshot) => !snapshot.hasData ? SizedBox.shrink() : DurationBox(
+                    onTextChange: _vm.updateRest,
+                    editable: snapshot.data.second,
+                    controller: _restController,
+                    nonEditableText: 'Rest Period: ${snapshot.data.first.restDurationSeconds}s',
+                    editableHint: 'Rest (sec)',
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Spacer(),
+          StreamBuilder<bool>(
+            stream: _vm.isRunning,
+            builder: (context, snapshot) => !snapshot.hasData ? SizedBox.shrink() : ActionButton(
+              stopped: !snapshot.data,
+              function: () {
+                _vm.onButtonPressed(
+                    activeSeconds: _activeController.text,
+                    restSeconds: _restController.text);
+              },
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.only(top: 32),
+            child: StreamBuilder<Pair<Counter, bool>>(
+              stream: Rx.combineLatest2(_vm.counter, _vm.isEditing, (a, b) => Pair(a,b)),
+              builder: (context, snapshot) => !snapshot.hasData ? SizedBox.shrink() : Visibility(
+                maintainState: true,
+                maintainSize: true,
+                maintainAnimation: true,
+                visible: !snapshot.data.second,
+                child: RichText(
+                  textAlign: TextAlign.center,
+                  text: spanned(
+                    "${(snapshot.data.first.isActive ? "Plank" : "Rest").toUpperCase()}\n${snapshot.data.first.currentToString()}",
+                    separator: '\n',
+                    style: TextStyle(
+                      height: 1.5,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: (snapshot.data.first.isActive)
+                          ? Colors.amber[200]
+                          : Colors.green[600],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-          body: Stack(
+          Spacer(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
-              Column(
-                children: <Widget>[
-                  Padding(
-                    padding: EdgeInsets.only(top: 32),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: <Widget>[
-                        DurationBox(
-                            editable: state is PlankInitialState,
-                            controller: _activeController,
-                            nonEditableText: !(state is PlankInitialState)
-                                ? "Active Period: ${state.activeDurationSeconds()}s"
-                                : '',
-                            editableHint: 'Active (sec)'),
-                        DurationBox(
-                            editable: state is PlankInitialState,
-                            controller: _restController,
-                            nonEditableText: !(state is PlankInitialState)
-                                ? "Rest Period: ${state.restDurationSeconds()}s"
-                                : '',
-                            editableHint: 'Rest (sec)'),
-                      ],
+              StreamBuilder<Pair<Counter, bool>>(
+                stream: Rx.combineLatest2(_vm.counter, _vm.isEditing, (a, b) => Pair(a, b)),
+                builder: (context, snapshot) => !snapshot.hasData ? SizedBox.shrink() : Visibility(
+                  maintainState: true,
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  visible: !snapshot.data.second,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: RichText(
+                      text: spanned(
+                        'Plank Summary:\n${snapshot.data.first.fullActivePeriods} times, ${snapshot.data.first.plankSummaryToString()}',
+                        separator: ':\n',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.amber[200].withOpacity(0.4),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                ],
-              ),
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    ActionButton(
-                      stopped: !(state is PlankCounterState),
-                      function: () {
-                        _bloc.onButtonPressed(
-                            activeSeconds: _activeController.text,
-                            restSeconds: _restController.text);
-                      },
-                    ),
-                    Padding(
-                        padding: EdgeInsets.only(top: 32),
-                        child: RichText(
-                                textAlign: TextAlign.center,
-                                text: spanned(
-                                  state is PlankInitialState
-                                      ? ' \n '
-                                      : "${(state.isActive() ? "Plank" : "Rest").toUpperCase()}\n${state.currentToString()}",
-                                  separator: '\n',
-                                  style: TextStyle(
-                                    height: 1.5,
-                                    fontSize: 32,
-                                    fontWeight: FontWeight.bold,
-                                    color: (!(state is PlankInitialState) && state.isActive())
-                                        ? Colors.amber[200]
-                                        : Colors.green[600],
-                                  ),
-                                ),
-                              ))
-                  ],
                 ),
               ),
-              Optional(
-                  condition: !(state is PlankInitialState),
-                  create: (context) => Positioned(
-                        left: 32,
-                        bottom: 32,
-                        child: RichText(
-                          text: spanned(
-                            "Plank Summary:\n${state.fullPlankPeriods()} times, ${state.plankSummaryToString()}",
-                            separator: ':\n',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.amber[200].withOpacity(0.4),
-                              fontWeight: FontWeight.bold,
+              StreamBuilder<Pair<bool, bool>>(
+                stream: Rx.combineLatest2(_vm.isRunning, _vm.isEditing, (a, b) => Pair(a,b)),
+                builder: (context, snapshot) => !snapshot.hasData ? SizedBox.shrink() : Visibility(
+                  maintainState: true,
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  visible: !snapshot.data.first && !snapshot.data.second,
+                  child: Padding(
+                    padding: EdgeInsets.only(right: 16, bottom: 12),
+                    child: RaisedButton(
+                        color: Colors.grey[900].withOpacity(0.5),
+                        child: Row(
+                          children: <Widget>[
+                            Icon(
+                              Icons.cancel,
+                              color: Colors.redAccent[700],
                             ),
-                          ),
+                            SizedBox(width: 8),
+                            Text(
+                              "RESET",
+                              style: TextStyle(
+                                  color: Colors.amber[200].withOpacity(0.7),
+                                  fontWeight: FontWeight.bold),
+                            )
+                          ],
                         ),
-                      )),
-              Optional(
-                  condition: state is PlankStopState,
-                  create: (context) => AnimatedPositioned(
-                        duration: Duration(milliseconds: 500),
-                        bottom: 20,
-                        right: 16,
-                        child: RaisedButton(
-                            color: Colors.grey[900].withOpacity(0.5),
-                            child: Row(
-                              children: <Widget>[
-                                Icon(
-                                  Icons.cancel,
-                                  color: Colors.redAccent[700],
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  "RESET",
-                                  style: TextStyle(
-                                      color: Colors.amber[200].withOpacity(0.7),
-                                      fontWeight: FontWeight.bold),
-                                )
-                              ],
-                            ),
-                            onPressed: () => _bloc.reset()),
-                      ))
+                        onPressed: () => _vm.reset()),
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
-      );
+        ],
+      ),
+    );
+  }
 }

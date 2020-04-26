@@ -3,14 +3,17 @@ import 'package:flutter/material.dart';
 class DurationTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
+  final Function(String) onTextChange;
 
   DurationTextField({
     @required this.hint,
+    @required this.onTextChange,
     @required this.controller
   });
 
   @override
   Widget build(BuildContext context) => TextField(
+    onChanged: onTextChange,
     style: TextStyle(color: Colors.grey[400]),
     cursorColor: Colors.grey[600],
     keyboardType: TextInputType.number,

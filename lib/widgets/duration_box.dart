@@ -9,12 +9,14 @@ class DurationBox extends StatelessWidget {
   final String nonEditableText;
 
   final TextEditingController controller;
+  final Function(String) onTextChange;
 
   DurationBox({
     @required this.editable,
     @required this.editableHint,
     @required this.nonEditableText,
     @required this.controller,
+    @required this.onTextChange,
   });
 
   @override
@@ -25,7 +27,11 @@ class DurationBox extends StatelessWidget {
         child: AnimatedSwitcher(
           duration: Duration(milliseconds: 150),
           child: editable
-              ? DurationTextField(hint: editableHint, controller: controller)
+              ? DurationTextField(
+                  hint: editableHint,
+                  onTextChange: onTextChange,
+                  controller: controller,
+                )
               : DurationText(nonEditableText),
         ),
       );

@@ -1,6 +1,6 @@
 
-
-import 'package:plank/widgets/optional.dart';
+import 'package:flutter/material.dart';
+import 'package:meta/meta.dart';
 
 TextSpan spanned(String text, {@required String separator, @required TextStyle style}) {
   final parts = text.split(separator);
