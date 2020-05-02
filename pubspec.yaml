@@ -14,7 +14,7 @@ description: A new Flutter application.
 version: 1.0.0+1
 
 environment:
-  sdk: ">=2.3.0 <3.0.0"
+  sdk: ">=2.6.0 <3.0.0"
 
 dependencies:
   flutter:
@@ -22,6 +22,8 @@ dependencies:
   hive: ^1.4.1+1
   hive_flutter: ^0.3.0+2
   rxdart: ^0.24.0
+  image_cropper: ^1.2.1
+  image_picker: ^0.6.5
 
 dev_dependencies:
   hive_generator: ^0.7.0+2
