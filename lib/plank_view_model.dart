@@ -38,16 +38,11 @@ class PlankViewModel {
   void updateRest(String rest) =>
       HiveManager.updateRestDuration(_duration(rest, _DEFAULT_REST_PERIOD));
 
-  void updateBackgroundImage(String path) =>
-      HiveManager.updateBackgroundImage(path);
-
   Future<int> activePeriod()  =>
       HiveManager.activeDuration(defaultValue: _DEFAULT_ACTIVE_PERIOD);
 
   Future<int> restPeriod()  =>
       HiveManager.restDuration(defaultValue: _DEFAULT_REST_PERIOD);
-
-  Future<String> backgroundImage()  => HiveManager.backgroundImage();
 
   Stream<bool> get isRunning => _run;
 

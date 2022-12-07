@@ -30,14 +30,4 @@ class HiveManager {
 
   static void updateRestDuration(int restDuration) =>
       _shared().then((value) => value.put(KEY_REST_PERIOD_SECONDS, restDuration));
-
-  static Future<String> backgroundImage({String defaultValue}) =>
-      _shared().then((it) => it.get(KEY_BACKGROUND_IMAGE, defaultValue: defaultValue));
-
-  static void updateBackgroundImage(String backgroundImage) =>
-      _shared().then((storage) => HiveManager.backgroundImage()
-            .then((path) => path == null || path == backgroundImage
-              ? null
-              : File(path).delete().catchError((_) => null))
-            .then((_) => storage.put(KEY_BACKGROUND_IMAGE, backgroundImage)));
 }
